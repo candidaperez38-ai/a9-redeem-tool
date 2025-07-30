@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#3498db" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Asphalt 9 Redeem Tool</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 20px; background: #f2f2f2; }
+    input, button { font-size: 14px; margin: 5px; padding: 7px; }
+    button { background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #2980b9; }
+    .redeemed { background: #27ae60 !important; color: white; }
+    .section { background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+    .button-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .clubmate-item { display: flex; gap: 5px; margin-bottom: 5px; }
+    .log-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+    .log-table th, .log-table td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    .log-table th { background: #eee; }
+  </style>
+</head>
+<body>
+  <h2>Asphalt 9 Redeem Tool</h2>
+
+  <div class="section">
+    <label><strong>Redeem Code:</strong></label><br>
+    <input type="text" id="code" placeholder="Enter code" size="40">
+    <button onclick="toggleTestMode()">Test Mode: <span id="testModeStatus">OFF</span></button>
+    <p><strong>Recently Used Codes:</strong> <span id="recentCodes"></span></p>
+  </div>
+
+  <div class="section">
+    <h3>Clubmates (Drag to Reorder)</h3>
+    <div id="clubmate-buttons" class="button-row" ondragover="event.preventDefault()"></div>
+  </div>
+
+  <div class="section">
+    <h3>Edit Clubmates</h3>
+    <div id="editor-list"></div>
+    <input type="text" id="newName" placeholder="Name">
+    <input type="text" id="newID" value="u-" placeholder="Gameloft ID (u-xxxxxx)">
+    <button onclick="addClubmate()">Add</button>
+  </div>
+
+  <div class="section">
+    <h3>Activity Log</h3>
+    <table class="log-table">
+      <thead><tr><th>Clubmate</th><th>Code</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let clubmates = JSON.parse(localStorage.getItem("clubmates")) || [];
+    let redeemedMap = JSON.parse(localStorage.getItem("redeemedMap")) || {};
+    let recentCodes = JSON.parse(localStorage.getItem("recentCodes")) || [];
+    let testMode = false;
+
+    const codeInput = document.getElementById("code");
+    const testModeStatus = document.getElementById("testModeStatus");
+    const recentDisplay = document.getElementById("recentCodes");
+    const logBody = document.getElementById("logBody");
+    const buttonsContainer = document.getElementById("clubmate-buttons");
+    const editorList = document.getElementById("editor-list");
+
+    let draggedIndex = null;
+
+    function renderButtons() {
+      buttonsContainer.innerHTML = "";
+      clubmates.forEach((m, index) => {
+        const btn = document.createElement("button");
+        btn.textContent = m.name;
+        btn.draggable = true;
+        if (redeemedMap[m.id]) btn.classList.add("redeemed");
+        btn.ondragstart = () => draggedIndex = index;
+        btn.ondrop = () => {
+          const dragged = clubmates.splice(draggedIndex, 1)[0];
+          clubmates.splice(index, 0, dragged);
+          saveClubmates();
+        };
+        btn.onclick = () => handleRedeem(m);
+        buttonsContainer.appendChild(btn);
+      });
+    }
+
+    function handleRedeem(m) {
+      const code = codeInput.value.trim();
+      if (!code) return alert("Enter a code first.");
+      if (recentCodes.includes(code) && !confirm("This code was already used. Continue?")) return;
+
+      const url = `https://www.gameloft.com/redeem/asphalt-legends?playerId=${encodeURIComponent(m.id)}&code=${encodeURIComponent(code)}`;
+      window.open(url, "_blank");
+
+      if (!testMode) {
+        redeemedMap[m.id] = true;
+        localStorage.setItem("redeemedMap", JSON.stringify(redeemedMap));
+        if (!recentCodes.includes(code)) {
+          recentCodes.unshift(code);
+          if (recentCodes.length > 5) recentCodes.pop();
+          localStorage.setItem("recentCodes", JSON.stringify(recentCodes));
+        }
+        addToLog(m.name, code, "Redeemed");
+      } else {
+        addToLog(m.name, code, "Test Mode");
+      }
+
+      renderButtons();
+      renderRecentCodes();
+    }
+
+    function renderRecentCodes() {
+      recentDisplay.innerText = recentCodes.join(" • ");
+    }
+
+    function addToLog(name, code, status) {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${name}</td><td>${code}</td><td>${new Date().toLocaleTimeString()}</td><td>${status}</td>`;
+      logBody.prepend(row);
+    }
+
+    function renderEditor() {
+      editorList.innerHTML = "";
+      clubmates.forEach((m, index) => {
+        const row = document.createElement("div");
+        row.className = "clubmate-item";
+        const nameInput = document.createElement("input");
+        const idInput = document.createElement("input");
+        const delBtn = document.createElement("button");
+
+        nameInput.value = m.name;
+        nameInput.onchange = e => { clubmates[index].name = e.target.value; saveClubmates(); };
+
+        idInput.value = m.id;
+        idInput.onchange = e => { clubmates[index].id = e.target.value; saveClubmates(); };
+
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => { clubmates.splice(index, 1); saveClubmates(); };
+
+        row.append(nameInput, idInput, delBtn);
+        editorList.appendChild(row);
+      });
+    }
+
+    function addClubmate() {
+      const name = document.getElementById("newName").value.trim();
+      const id = document.getElementById("newID").value.trim();
+      if (!name || !id) return alert("Name and ID required.");
+      if (!/^u-\w{6}$/.test(id)) return alert("ID must be 'u-' followed by 6 characters.");
+      clubmates.push({ name, id });
+      document.getElementById("newName").value = "";
+      document.getElementById("newID").value = "u-";
+      saveClubmates();
+    }
+
+    function saveClubmates() {
+      localStorage.setItem("clubmates", JSON.stringify(clubmates));
+      renderButtons();
+      renderEditor();
+    }
+
+    function toggleTestMode() {
+      testMode = !testMode;
+      testModeStatus.textContent = testMode ? "ON" : "OFF";
+    }
+
+    renderButtons();
+    renderEditor();
+    renderRecentCodes();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(() => console.log("ServiceWorker registered."));
+    }
+  </script>
+</body>
+</html>

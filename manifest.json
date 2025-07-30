@@ -1,0 +1,16 @@
+{
+  "name": "Asphalt 9 Redeem Tool",
+  "short_name": "A9 Redeem",
+  "start_url": "redeem-helper-pwa.html",
+  "display": "standalone",
+  "background_color": "#f2f2f2",
+  "theme_color": "#3498db",
+  "description": "Quick redeem helper for Asphalt 9 club codes",
+  "icons": [
+    {
+      "src": "https://www.gameloft.com/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
