@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Asphalt 9 - Redeem Code Tool</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .input-block { margin-bottom: 15px; }
+    .clubmates { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+    .clubmates button { padding: 5px 10px; background-color: #2196F3; color: white; border: none; border-radius: 5px; cursor: grab; }
+    .clubmates button.redeemed { background-color: gray; cursor: not-allowed; }
+    #activity-log table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    #activity-log th, #activity-log td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+    #recent-codes { margin-top: 10px; font-style: italic; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Asphalt 9 - Redeem Code Tool</h1>
+
+  <div class="input-block">
+    <label for="player-id">Gameloft ID:</label>
+    <input type="text" id="player-id" placeholder="u-123abc" oninput="validateId()" />
+    <span id="id-error" class="error"></span>
+  </div>
+
+  <div class="input-block">
+    <label for="redeem-code">Enter your redeem code once:</label>
+    <input type="text" id="redeem-code" placeholder="e.g. fu7db5mg" />
+  </div>
+
+  <button onclick="startRedemption(false)">Redeem All</button>
+  <button onclick="startRedemption(true)">Test Mode</button>
+
+  <h2>Clubmates (Sorted & Draggable)</h2>
+  <div class="clubmates" id="clubmates" ondrop="drop(event)" ondragover="allowDrop(event)">
+  </div>
+
+  <div id="recent-codes"></div>
+
+  <h2>Activity Log</h2>
+  <div id="activity-log">
+    <table>
+      <thead>
+        <tr><th>Clubmate</th><th>Code</th><th>Time</th><th>Status</th></tr>
+      </thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const clubmateNames = ["Qu", "Carter", "7Re", "Firefly"];
+    const redeemed = new Set();
+    const recentCodes = [];
+
+    function populateClubmates() {
+      const container = document.getElementById("clubmates");
+      container.innerHTML = "";
+      clubmateNames.forEach((name, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = name;
+        btn.id = "cm-" + idx;
+        btn.draggable = true;
+        btn.ondragstart = drag;
+        btn.onclick = () => handleRedeem(name);
+        if (redeemed.has(name)) btn.classList.add("redeemed");
+        container.appendChild(btn);
+      });
+    }
+
+    function drag(ev) {
+      ev.dataTransfer.setData("text", ev.target.id);
+    }
+
+    function allowDrop(ev) {
+      ev.preventDefault();
+    }
+
+    function drop(ev) {
+      ev.preventDefault();
+      const draggedId = ev.dataTransfer.getData("text");
+      const draggedEl = document.getElementById(draggedId);
+      const container = document.getElementById("clubmates");
+      const after = Array.from(container.children).find(c => ev.clientX < c.getBoundingClientRect().left + c.offsetWidth / 2);
+      container.insertBefore(draggedEl, after);
+      updateOrder();
+    }
+
+    function updateOrder() {
+      const btns = document.querySelectorAll("#clubmates button");
+      clubmateNames.length = 0;
+      btns.forEach(btn => clubmateNames.push(btn.textContent));
+    }
+
+    function validateId() {
+      const id = document.getElementById("player-id").value;
+      const error = document.getElementById("id-error");
+      error.textContent = (!/^u-[a-zA-Z0-9]{6}$/.test(id)) ? "Invalid ID format" : "";
+    }
+
+    function handleRedeem(name, testMode = false) {
+      const id = document.getElementById("player-id").value;
+      const code = document.getElementById("redeem-code").value.trim();
+      if (!/^u-[a-zA-Z0-9]{6}$/.test(id)) {
+        alert("Invalid ID format.");
+        return;
+      }
+      if (!code) {
+        alert("Enter a redeem code.");
+        return;
+      }
+
+      if (recentCodes.includes(code)) {
+        alert("Warning: This code was recently used.");
+      }
+
+      const url = `https://www.gameloft.com/redeem/asphalt-legends?playerId=${id}&code=${code}`;
+      if (!testMode) {
+        window.open(url, "_blank");
+        redeemed.add(name);
+      }
+
+      if (!recentCodes.includes(code)) {
+        recentCodes.unshift(code);
+        if (recentCodes.length > 5) recentCodes.pop();
+      }
+
+      logActivity(name, code, testMode);
+      populateClubmates();
+      showRecentCodes();
+    }
+
+    function showRecentCodes() {
+      document.getElementById("recent-codes").textContent = "Recently Used Codes: " + recentCodes.join(", ");
+    }
+
+    function logActivity(name, code, testMode) {
+      const row = document.createElement("tr");
+      const now = new Date().toLocaleTimeString();
+      row.innerHTML = `<td>${name}</td><td>${code}</td><td>${now}</td><td>${testMode ? "Test Mode" : "Redeemed"}</td>`;
+      document.getElementById("log-body").prepend(row);
+    }
+
+    async function startRedemption(testMode) {
+      for (const name of clubmateNames) {
+        if (!redeemed.has(name)) {
+          handleRedeem(name, testMode);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
+
+    window.onload = populateClubmates;
+  </script>
+</body>
+</html>
